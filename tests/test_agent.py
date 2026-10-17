@@ -5,6 +5,7 @@ import types
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+import memstore
 
 AGENT_PATH = Path(__file__).resolve().parents[1] / "agents" / "agent1" / "agent.py"
 
@@ -16,6 +17,8 @@ class AgentTests(unittest.TestCase):
         fake_llm.ask_llm = self.ask_llm
         fake_memory = types.ModuleType("memstore.memory")
         fake_memory.save_memory = self.save_memory
+        self.had_memory_attribute = hasattr(memstore, "memory")
+        self.original_memory_attribute = getattr(memstore, "memory", None)
         self.modules_patch = patch.dict(sys.modules, {"llm": fake_llm, "memstore.memory": fake_memory})
         self.modules_patch.start()
         spec = importlib.util.spec_from_file_location("agent_under_test", AGENT_PATH)
@@ -24,6 +27,10 @@ class AgentTests(unittest.TestCase):
 
     def tearDown(self):
         self.modules_patch.stop()
+        if self.had_memory_attribute:
+            memstore.memory = self.original_memory_attribute
+        elif hasattr(memstore, "memory"):
+            delattr(memstore, "memory")
         sys.modules.pop("agent_under_test", None)
 
     def test_handle_message_returns_model_reply(self):
