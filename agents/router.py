@@ -1,9 +1,18 @@
-"""Route straightforward arithmetic requests to the calculator agent."""
+"""Route calculator, memory-retrieval, and general chat requests."""
 import re
 
 from agents.calculator.agent import CalculatorError, calculate
 from agents.agent1.agent import handle_message as handle_chat_message
+from agents.memory.agent import format_memories, search_memory
 
+_MEMORY_PREFIXES = (
+    "memory ",
+    "remember ",
+    "recall ",
+    "what did i ask about ",
+    "what did we discuss about ",
+    "show my history",
+)
 _PREFIXES = (
     "calculate ",
     "compute ",
@@ -15,9 +24,20 @@ _EXPRESSION = re.compile(r"^[0-9\s.+*/%()\-]+$")
 
 
 def route_message(user: str, message: str) -> str:
-    """Route arithmetic-only requests to calculator; all other text to chat."""
+    """Route explicit memory requests, arithmetic, and other text to agents."""
     if not isinstance(message, str) or not message.strip():
         raise ValueError("message must be a non-empty string")
+    if not isinstance(user, str) or not user.strip():
+        raise ValueError("user must be a non-empty string")
+
+    candidate = message.strip().lower()
+    for prefix in _MEMORY_PREFIXES:
+        if candidate.startswith(prefix):
+            query = message.strip()[len(prefix):].strip()
+            if prefix == "show my history":
+                query = None
+            records = search_memory(user, query=query)
+            return format_memories(records)
 
     candidate = message.strip().lower()
     for prefix in _PREFIXES:
